@@ -16,10 +16,10 @@ class Settings(BaseSettings):
     )
 
     # Telegram Bot
-    TELEGRAM_TOKEN: str
-    CHAT_ID: str  # ID чата, куда бот будет отправлять уведомления
+    #TELEGRAM_TOKEN: str
+    #CHAT_ID: str  # ID чата, куда бот будет отправлять уведомления
     #WEBHOOK_URL: str = None  # если будешь использовать webhook
-    API_BASE: str
+    #API_BASE: str
 
 
     #API_URL: str  # например http://127.0.0.1:8000

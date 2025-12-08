@@ -60,6 +60,7 @@ class RequestFormat:
     data: dict[str, Any] | str | bytes | None = None
     headers: dict[str, str] | None = None
     return_type: Literal["json", "text", "bytes"] = "json"
+    verify: bool = True
 
     def __post_init__(self):
         """Просто приводим метод к верхнему регистру"""

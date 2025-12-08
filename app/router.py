@@ -71,11 +71,15 @@ async def shutdown_proxmox(background_tasks: BackgroundTasks, delay: int = Query
     Выполняется в фоне.
     delay: int = задержка перед выключением в секундах (по умолчанию 0)
     """
-    logger.info(f"Запуск выключения всех VM с задержкой {delay} минут")
-    #background_tasks.add_task(proxmox.run_shutdown, delay)
-    result = await proxmox.run_shutdown(delay=delay)
+    try:
+        logger.info(f"Запуск выключения всех VM с задержкой {delay} минут")
+        background_tasks.add_task(proxmox.shutdown_task, delay)
+        return {"status": "success", "message": f"Выключение запланировано через {delay} мин"}
+    except Exception as e:
+        logger.exception(f"Ошибка при запуске shutdown задачи: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка запуска выключения: {e}")
 
-    return {"status": "success", "data": result}
+
 
 @prox_ssh.post("/connect_ssh", summary="Выполнение команды в консоли Proxmox", description= 'Подключаемся по ssh к Proxmox и выполняем команду cmd')
 async def connect_ssh(command:str):
