@@ -39,19 +39,19 @@ class ProxmoxService:
             self.logger.error(f"Ошибка {func.__name__}: {e}")
             return ServiceResponse(status=ServiceStatus.error, message=msg or "Ошибка", error=str(e))
 
-    def check_connection(self) -> ServiceResponse:
+    async def check_connection(self) -> ServiceResponse:
         """Проверка доступности Proxmox API"""
         try:
-            _ = self.client.get_vms()  # если запрос успешный — соединение ок
+            _ = await self.client.get_vms()  # если запрос успешный — соединение ок
             return ServiceResponse(status=ServiceStatus.success, message="Соединение с Proxmox успешно", data={"status": 200})
         except Exception as e:
             self.logger.error(f"Ошибка соединения с Proxmox: {e}")
             return ServiceResponse(status=ServiceStatus.error, message="Не удалось подключиться к Proxmox", error=str(e))
 
-    def get_running_vms(self):
+    async def get_running_vms(self):
         """Возвращает список запущенных VM"""
         try:
-            vms_data = self.client.get_vms()
+            vms_data = await self.client.get_vms()
             vms = [VM(**vm) for vm in vms_data]
             running = [vm.to_dict() for vm in vms if vm.is_running()]
             return ServiceResponse(status=ServiceStatus.success, message="Список запущенных VM", data={"running_vms": running})
@@ -59,22 +59,22 @@ class ProxmoxService:
             self.logger.error(f"Ошибка получения списка VM: {e}")
             return ServiceResponse(status=ServiceStatus.error, message="Ошибка получения списка VM", error=str(e))
 
-    def start_vm(self, vmid: int, node: str) -> ServiceResponse:
+    async def start_vm(self, vmid: int, node: str) -> ServiceResponse:
         """Запуск одной виртуальной машины"""
         try:
-            result = self.client.start_vm(vmid, node)
+            result = await self.client.start_vm(vmid, node)
             return ServiceResponse(status=ServiceStatus.success, message=f"VM {vmid} запущена", data={"result": result})
         except Exception as e:
             self.logger.error(f"Ошибка запуска VM {vmid}: {e}")
             return ServiceResponse(status=ServiceStatus.error, message=f"Ошибка запуска VM {vmid}", error=str(e))
 
-    def start_all_vms(self):
+    async def start_all_vms(self):
         """Запуск всех виртуальных машин"""
         try:
-            vms_data = self.client.get_vms()
+            vms_data = await self.client.get_vms()
             results = {}
             for vm in vms_data:
-                results[vm["vmid"]] = self.client.start_vm(vm["vmid"], vm["node"])
+                results[vm["vmid"]] = await self.client.start_vm(vm["vmid"], vm["node"])
             return ServiceResponse(status=ServiceStatus.success, message="Запуск всех VM завершен", data={"results": results})
         except Exception as e:
             self.logger.error(f"Ошибка запуска всех VM: {e}")
@@ -85,7 +85,7 @@ class ProxmoxService:
         start = time.time()
         try:
             while True:
-                vms_data = self.client.get_vms()
+                vms_data = await self.client.get_vms()
                 running = [vm for vm in vms_data if vm.get("status") == "running"]
 
                 if not running:

@@ -19,25 +19,31 @@ class ProxmoxAPIClient:
         if response.success and isinstance(response.data, dict):
             return response.data.get("data", [])
         else:
-            raise Exception(f"Ошибка получения VM: {response.error or response.data}")
+            raise Exception(f"[ProxmoxAPIClient.get_vms] Ошибка получения VM: {response.error or response.data}")
 
     async def start_vm(self, vmid: int, node: str) -> bool:
         """Запуск конкретной VM"""
         request = RequestFormat(method="POST", endpoint=f"/api2/json/nodes/{node}/qemu/{vmid}/status/start")
         response: ResponseFormat = await self.client.request_async(request)
-        return response.success
+        if not response.success:
+            raise Exception(f"[ProxmoxAPIClient.start_vm] Не удалось запустить VM {vmid} на узле {node}")
+        return True
 
     async def shutdown_vm(self, vmid: int, node: str) -> bool:
         """Выключение конкретной VM"""
         request = RequestFormat(method="POST", endpoint=f"/api2/json/nodes/{node}/qemu/{vmid}/status/shutdown")
         response: ResponseFormat = await self.client.request_async(request)
-        return response.success
+        if not response.success:
+            raise Exception(f"[ProxmoxAPIClient.shutdown_vm] Не удалось выключить VM {vmid} на узле {node}")
+        return True
 
     async def shutdown_server(self, node_name: str = "pve") -> bool:
         """Выключение Proxmox сервера"""
         request = RequestFormat(method="POST", endpoint=f"/api2/json/nodes/{node_name}/status/shutdown")
         response: ResponseFormat = await self.client.request_async(request)
-        return response.success
+        if not response.success:
+            raise Exception(f"[ProxmoxAPIClient.shutdown_server] Не удалось выключить сервер {node_name}")
+        return True
 
     async def run_ssh_command(self, command: str):
         """Выполнение произвольной команды на Proxmox через SSH"""
