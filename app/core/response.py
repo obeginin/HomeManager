@@ -1,20 +1,29 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 import json
+
+class ServiceStatus(str, Enum):
+    success = "success"
+    error = "error"
+    access_denied = "access_denied"
+    not_found = "not_found"
+    timeout = "timeout"
+    warning = "warning"
 
 @dataclass
 class ServiceResponse:
     """Унифицированный формат ответа для обмена между сервисами"""
-    status: str = "success"   # success, error, access_denied и т.д.
-    msg: str = ""             # Сообщение при успешной операции
-    error: str = ""           # Сообщение об ошибке
+    status: ServiceStatus = ServiceStatus.success   # success, error, access_denied и т.д.
+    message: str = ""             # Сообщение при успешной операции
+    error: str = None           # Сообщение об ошибке
     data: Any = field(default_factory=dict)  # Любые дополнительные данные
 
     def to_dict(self) -> dict:
         """Конвертируем в словарь"""
         return {
             "status": self.status,
-            "msg": self.msg,
+            "message": self.message,
             "error": self.error,
             "data": self.data
         }

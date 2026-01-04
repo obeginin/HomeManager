@@ -22,4 +22,4 @@ ENV TZ=$TIMEZONE
 
 EXPOSE 8888
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8888 ${DEBUG:+--reload}"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8888 ${RELOAD:+--reload}"]

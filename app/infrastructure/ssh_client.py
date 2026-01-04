@@ -1,5 +1,3 @@
-
-
 import time
 import asyncssh
 from typing import List, AsyncGenerator, Optional
@@ -27,6 +25,9 @@ class AsyncSSHClient:
 
     async def connect(self):
         '''ручное открытие соединения'''
+        if self.conn:  # ← ВАЖНО
+            return
+
         try:
             self.conn = await asyncssh.connect(
                 self.host,
@@ -37,7 +38,7 @@ class AsyncSSHClient:
             )
             self.logger.info(f"Успешное подключение к хосту {self.host}")
         except Exception as e:
-            self.logger.error(f"Ошибка подключения к хосту {self.host}: {e}")
+            self.logger.exception(f"Ошибка подключения к хосту {self.host}: {e}")
             raise
 
     async def close(self):
@@ -70,7 +71,6 @@ class AsyncSSHClient:
 
     async def execute_command(self, command: str) -> List[str]:
         """Выполнение команды и возврат всех результатов в списке"""
-        await self.connect()
         self.logger.info(f"Выполняю команду: {command}")
         try:
             result = await self.conn.run(command, check=False)
@@ -80,17 +80,16 @@ class AsyncSSHClient:
             self.logger.info(lines)
             return lines
         except Exception as e:
-            self.logger.error(f"Ошибка выполнения команды '{command}': {e}")
+            self.logger.exception(f"Ошибка выполнения команды '{command}': {e}")
             raise
 
     async def execute_command_streaming(self, command: str) -> AsyncGenerator[str, None]:
         """Выполнение команды с потоковым выводом построчно"""
-        await self.connect()
         self.logger.info(f"Выполняю команду (streaming): {command}")
         try:
             async with self.conn.create_process(command) as process:
                 async for line in process.stdout:
                     yield line.rstrip()
         except Exception as e:
-            self.logger.error(f"Ошибка выполнения команды: {e}")
+            self.logger.exception(f"Ошибка выполнения команды: {e}")
             raise

@@ -1,50 +1,51 @@
-from datetime import datetime
+from datetime import datetime, timezone
+import traceback
 import logging
 from pathlib import Path
 from logging.handlers import TimedRotatingFileHandler
 import json
 import threading
 
-
+'''
+# логирование в json с трассировкой
+logger.exception(f"Ошибка")
+logger.error(f"Ошибка", exc_info=True)
+logger.critical(f"Ошибка", exc_info=True)
+        '''
 class JsonFormatter(logging.Formatter):
     """Json формат логов"""
-    def __init__(self):
+    def init(self):
         # Передаем None чтобы избежать проблем с форматом
-        super().__init__(fmt=None, datefmt=None)
+        super().init(fmt=None, datefmt=None)
 
     def format(self, record: logging.LogRecord) -> str:
-        timestamp = datetime.now().isoformat(timespec='milliseconds')  # Используем текущее время с миллисекундами
+        now_utc = datetime.now(timezone.utc)
+        timestamp = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
 
         log_record = {
             "timestamp": timestamp,
             "level": record.levelname,
             "module": record.name,
-
         }
 
         message = record.getMessage()
         # Проверяем, не JSON ли это
-
-
         try:
-            if message.strip().startswith('{') and message.strip().endswith('}'):
-                data = json.loads(message)
-                # Если успешно - добавляем все поля из JSON
-                log_record.update(data)
-            else:
-                log_record["message"] = message
-        except:
-            # Если ошибка парсинга - оставляем как строку
+            data = json.loads(message)
+            log_record.update(data)
+        except Exception:
             log_record["message"] = message
 
-        # Добавляем trace_id если есть
-        trace_id = getattr(record, "trace_id", None)
-        if trace_id:
-            log_record["trace_id"] = trace_id
+            # trace_id
+        if hasattr(record, "trace_id"):
+            log_record["trace_id"] = record.trace_id
 
-        # Добавляем информацию об исключении если есть
-        if record.exc_info:
-            log_record["exception"] = self.formatException(record.exc_info)
+        # Добавляем информацию об ошибке если есть (для уровней логирования: ERROR, CRITICAL)
+        if record.exc_info and record.levelno >= logging.ERROR:
+            exc_type, exc_value, exc_tb = record.exc_info
+
+            log_record["error"] = {"type": exc_type.__name__, "message": str(exc_value)}
+            log_record["stacktrace"] = "".join(traceback.format_exception(exc_type, exc_value, exc_tb) )
 
         return json.dumps(log_record, ensure_ascii=False, default=str)
 
@@ -61,8 +62,6 @@ class SmartTimedRotatingFileHandler(TimedRotatingFileHandler):
         base, ext = self.baseFilenameNoExt, self.ext
         date_str = default_name.split(".")[-1]  # "2025-12-02"
         return f"{base}.{date_str}{ext}"
-        # date_str = datetime.now().strftime(self.suffix)
-        # return f"{self.baseFilenameNoExt}.{date_str}{self.ext}"
 
 class LoggerConfig:
     """Универсальный класс для настройки логирования"""
@@ -97,13 +96,12 @@ class LoggerConfig:
             self.log_dir.mkdir(parents=True, exist_ok=True)
         except Exception as e:
             print(f"Не удалось создать директорию для логов {self.log_dir}: {e}")
+        self.logger = self.get_logger(self.app_logger_name)
+
 
     def _resolve_log_dir(self, log_dir: str | Path | None = None) -> Path:
         '''определям путь к директории для логов'''
         project_root = Path.cwd() # корень проекта
-        # print("__file__", __file__)
-        # print("project_root", Path(__file__).resolve().parent.parent)
-        # print()
         if log_dir is None:
             return project_root / "logs"    # если не передан, то берет по умолчанию папку проекта/ + logs
         elif Path(log_dir).is_absolute():
@@ -117,6 +115,7 @@ class LoggerConfig:
             root = logging.getLogger()
             if root.handlers:
                 return  # уже настроено
+
             log_path = self.log_dir / self.log_file
             # Выбираем форматтер
             formatter = JsonFormatter() if self.use_json else logging.Formatter(self.log_format)
@@ -137,19 +136,13 @@ class LoggerConfig:
             for h in handlers:
                 root.addHandler(h)
             root.setLevel(getattr(logging, self.log_level, logging.INFO))
-            logging.info(f"Логирование инициализировано. Лог файл: {log_path}")
+            self.logger.info(repr(self))
 
     def get_logger(self, name: str | None = None) -> logging.Logger:
         """Именованный логгер (по умолчанию __name__)"""
         logger = logging.getLogger(name or __name__)
         #logger.propagate = False  # избегаем дублирования в root
         return logger
-
-    def update_level(self, new_level: str) -> None:
-        """Динамическое изменение уровня логирования"""
-        self.log_level = new_level.upper()
-        logging.getLogger().setLevel(getattr(logging, self.log_level, logging.INFO))
-        logging.info(f"Уровень логирования изменен на: {self.log_level}")
 
     def get_log_path(self) -> Path:
         'путь '
@@ -161,11 +154,3 @@ class LoggerConfig:
 
 
 
-
-'''
-для запуска
-logger_config = LoggerConfig(log_file='ClassFiles.log', console_output=False)
-logger_config.setup_logger()
-logger = logger_config.get_logger(__name__)
-logger.info("Класс ClassFiles")
-'''
