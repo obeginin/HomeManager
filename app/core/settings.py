@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from utils.ClassLogger import LoggerConfig
+from app.core.ClassLogger import LoggerConfig
 from pydantic import Field
 
 # TODO то что требовалось перевел на асинхронный postgres, остальное не обязательно так как используется только при стратре приложения ( не критично)
@@ -72,4 +72,5 @@ logger_config = LoggerConfig(
     console_output=True,
     use_json=False,
 )
+logger_config.setup_logger()
 # settings.create_dirs() создаются при инициализации init
