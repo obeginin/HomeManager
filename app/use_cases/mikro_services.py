@@ -1,5 +1,5 @@
 from app.infrastructure.ssh_client import AsyncSSHClient
-from app.core.base import ServiceResponse
+from app.core.response import ServiceResponse, ServiceStatus
 from app.core.settings import settings
 import logging
 
@@ -21,11 +21,12 @@ class MikrotikService:
                     logger=self.logger
             ) as client:
                 result = await client.run_command(command)
-            return ServiceResponse(msg="Команда выполнена успешно", data={"result": result})
+            return ServiceResponse(status=ServiceStatus.success, message="Команда выполнена успешно", data={"result": result})
         except Exception as e:
             self.logger.error(f"Ошибка выполнения команды на Mikrotik: {e}")
-            return ServiceResponse(status="error", error=str(e))
+            return ServiceResponse(status=ServiceStatus.error, message="Ошибка выполнения команды на Mikrotik", error=str(e))
 
     async def wake_proxmox(self) -> ServiceResponse:
         """Запуск сервера Proxmox через Mikrotik"""
+        self.logger.info("Инициирован запуск Proxmox через Mikrotik (WOL)")
         return await self.run_command("system script run WakeProxmox")

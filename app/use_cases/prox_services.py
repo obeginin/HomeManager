@@ -1,11 +1,15 @@
 # application/prox_services.py
 import asyncio
+from wakeonlan import send_magic_packet
+import time
 from app.domain.vm import VM
 from app.infrastructure.prox_api_client import ProxmoxAPIClient
 from app.infrastructure.ssh_client import AsyncSSHClient
-from app.core.base import ServiceResponse
+from app.core.response import ServiceResponse, ServiceStatus
 from app.core.settings import settings
 import logging
+logger = logging.getLogger(__name__)
+
 
 def service_handler(default_msg: str = ""):
     """Декоратор для унифицированной обработки ошибок и ServiceResponse"""
@@ -28,7 +32,18 @@ def service_handler(default_msg: str = ""):
 class ProxmoxService:
     def __init__(self, api_client: ProxmoxAPIClient, logger: logging.Logger):
         self.client = api_client
-        self.logger = logging.getLogger(f"{logger.name}.{self.__class__.__name__}")
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    async def send_wol(self) -> ServiceResponse:
+        """Отправка WOL-пакета через библиотеку wakeonlan"""
+        try:
+            send_magic_packet(settings.PROX_MAC, ip_address=settings.PVE_HOST_IP)
+            self.logger.info(f"WOL-пакет отправлен {settings.PROX_MAC}")
+            return ServiceResponse(status=ServiceStatus.success, message=f"WOL-пакет отправлен" )
+        except Exception as e:
+            logger.error(f"Ошибка отправки WOL-пакета: {e}")
+            return ServiceResponse(status=ServiceStatus.error, message="Ошибка отправки WOL-пакета", error=str(e))
+
 
     async def _call_client(self, func, *args, msg: str = "", **kwargs) -> ServiceResponse:
         '''приватный метод, который делает try/except и возвращает ServiceResponse'''
@@ -53,7 +68,7 @@ class ProxmoxService:
         try:
             vms_data = await self.client.get_vms()
             vms = [VM(**vm) for vm in vms_data]
-            running = [vm.to_dict() for vm in vms if vm.is_running()]
+            running = [vm.to_dict() for vm in vms if vm.status == "running"]
             return ServiceResponse(status=ServiceStatus.success, message="Список запущенных VM", data={"running_vms": running})
         except Exception as e:
             self.logger.error(f"Ошибка получения списка VM: {e}")
@@ -105,9 +120,8 @@ class ProxmoxService:
     async def shutdown_all_vms(self) -> ServiceResponse:
         """Выключаем все VM и ждём завершения"""
         try:
-            vms_data = self.client.get_vms()
-            tasks = [asyncio.to_thread(self.client.shutdown_vm, vm["vmid"], vm["node"])
-                     for vm in vms_data]
+            vms_data = await self.client.get_vms()
+            tasks = [self.client.shutdown_vm(vm["vmid"], vm["node"]) for vm in vms_data]
             await asyncio.gather(*tasks)
 
             # Ждём полного выключения VM
@@ -117,7 +131,7 @@ class ProxmoxService:
             self.logger.error(f"Ошибка shutdown_all_vms: {e}")
             return ServiceResponse(status=ServiceStatus.error, message="Ошибка shutdown_all_vms:", error=str(e))
 
-    async def shutdown_server(self, delay: int = 0) -> ServiceResponse:
+    async def shutdown_server(self, delay: int = 0) -> None:
         """Выключение всех VM с задержкой и самого сервера Proxmox"""
         try:
             if delay > 0:
@@ -138,11 +152,9 @@ class ProxmoxService:
             ) as client:
                 ssh_result = await client.run_command("shutdown -h now")
 
-            return ServiceResponse(status=ServiceStatus.success, message="Сервер Proxmox выключен", data={"ssh_result": ssh_result})
-
+            self.logger.info("Shutdown сервера инициирован")
         except Exception as e:
-            self.logger.error(f"Ошибка shutdown_server: {e}")
-            return ServiceResponse(status=ServiceStatus.error, message="Ошибка shutdown_server", error=str(e))
+            self.logger.error(f"Ошибка при shutdown Proxmox: {e}")
 
     async def run_ssh_command(self, command: str) -> ServiceResponse:
         """Выполнение команды на сервере через SSH"""

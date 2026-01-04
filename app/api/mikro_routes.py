@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from app.use_cases.mikro_services import MikrotikService
-from app.core.logger import logger
+import logging
+logger = logging.getLogger(__name__)
 
 mikro = APIRouter(prefix="/mikro", tags=["mikro"])
 service = MikrotikService(logger)

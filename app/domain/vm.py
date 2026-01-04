@@ -1,11 +1,14 @@
 # domain/vm.py
-from dataclasses import dataclass
+from pydantic import BaseModel
 
-@dataclass
-class VM:
+
+class VM(BaseModel):
     vmid: int
-    node: str
+    name: str
     status: str
 
-    def is_running(self) -> bool:
-        return self.status == "running"
+    class Config:
+        extra = "ignore"
+
+    def to_dict(self):
+        return {"vmid": self.vmid, "name": self.name, "status": self.status}
